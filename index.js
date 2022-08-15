@@ -25,13 +25,7 @@ const initializeDBAndServer = async () => {
 };
 initializeDBAndServer();
 
-const logger = (request, response, next) => {
-  console.log(request.query);
-};
-
-//Get Books API
-app.get("/books/", logger, (request, response) => {
-  console.log("Inside Get Books API");
+const authenticationToken = (request, response, next) => {
   let jwtToken;
   const authHeader = request.headers["authorization"];
   if (authHeader !== undefined) {
@@ -45,18 +39,39 @@ app.get("/books/", logger, (request, response) => {
       if (error) {
         response.send("Invalid Access Token");
       } else {
-        const getBooksQuery = `
+        request.username = payload.username;
+        next();
+      }
+    });
+  }
+};
+
+//Get Profile API
+app.get("/profile/", authenticationToken, async (request, response) => {
+  let { username } = request;
+  console.log(username);
+  const selectUserQuery = `
+  SELECT
+    *
+  FROM
+    user
+  WHERE
+    username = '${username}';`;
+  const userDetails = await db.get(selectUserQuery);
+  response.send(userDetails);
+});
+
+//Get Books API
+app.get("/books/", authenticationToken, async (request, response) => {
+  const getBooksQuery = `
             SELECT
               *
             FROM
              book
             ORDER BY
              book_id;`;
-        const booksArray = await db.all(getBooksQuery);
-        response.send(booksArray);
-      }
-    });
-  }
+  const booksArray = await db.all(getBooksQuery);
+  response.send(booksArray);
 });
 
 //Get Book API
@@ -99,7 +114,7 @@ app.post("/users/", async (request, response) => {
   if (dbUser === undefined) {
     const createUserQuery = `
       INSERT INTO 
-        user (username, name, password, gender, location) 
+        user (username, name, password, gender, location)
       VALUES 
         (
           '${username}', 
